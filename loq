@@ -21,7 +21,7 @@ log_error() {
 
 # Function to display notification
 notify() {
-  notify-send -t 500 -e --hint=int:transient:1 -u normal -a "loq" "$1" "$2"
+  notify-send -t 1 -e --hint=int:transient:1 -u normal -a "loq" "$1" "$2"
   echo "[NOTIFICATION] $1: $2"
 }
 
