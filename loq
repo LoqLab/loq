@@ -152,11 +152,25 @@ stop_recording() {
 
   sleep 0.2 # seems we need to pad slightly for whisper to get the last word
 
-  local pid=$(cat "$TMP_DIR/recording_pid")
-  kill $pid
+  # Kill recording process if it exists
+  if [ -f "$TMP_DIR/recording_pid" ]; then
+    local pid=$(cat "$TMP_DIR/recording_pid")
+    if kill -0 $pid 2>/dev/null; then
+      kill $pid
+    else
+      echo "[DEBUG] Recording process $pid no longer exists"
+    fi
+  fi
 
-  local pid=$(cat "$TMP_DIR/cleanup_pid")
-  kill -HUP $pid
+  # Kill cleanup process if it exists
+  if [ -f "$TMP_DIR/cleanup_pid" ]; then
+    local cleanup_pid=$(cat "$TMP_DIR/cleanup_pid")
+    if kill -0 $cleanup_pid 2>/dev/null; then
+      kill -HUP $cleanup_pid
+    else
+      echo "[DEBUG] Cleanup process $cleanup_pid no longer exists"
+    fi
+  fi
 
   # Remove lock file to indicate recording is stopped
   rm -f "$TMP_DIR/recording.lock"
@@ -250,6 +264,55 @@ redo_transcription() {
   process_audio "$mp3_file" "false" "false"
 }
 
+# Function to reset and clean up temporary files and processes
+reset_loq() {
+  echo "[DEBUG] Resetting loq state..."
+  
+  # Kill any recording process if it exists
+  if [ -f "$TMP_DIR/recording_pid" ]; then
+    local pid=$(cat "$TMP_DIR/recording_pid")
+    if kill -0 $pid 2>/dev/null; then
+      echo "[DEBUG] Killing recording process $pid"
+      kill $pid
+    else
+      echo "[DEBUG] Recording process $pid no longer exists"
+    fi
+    rm -f "$TMP_DIR/recording_pid"
+  fi
+  
+  # Kill any cleanup process if it exists
+  if [ -f "$TMP_DIR/cleanup_pid" ]; then
+    local cleanup_pid=$(cat "$TMP_DIR/cleanup_pid")
+    if kill -0 $cleanup_pid 2>/dev/null; then
+      echo "[DEBUG] Killing cleanup process $cleanup_pid"
+      kill -HUP $cleanup_pid
+    else
+      echo "[DEBUG] Cleanup process $cleanup_pid no longer exists"
+    fi
+    rm -f "$TMP_DIR/cleanup_pid"
+  fi
+  
+  # Remove lock file if it exists
+  if [ -f "$TMP_DIR/recording.lock" ]; then
+    echo "[DEBUG] Removing recording lock file"
+    rm -f "$TMP_DIR/recording.lock"
+  fi
+  
+  # Remove audio file reference if it exists
+  if [ -f "$TMP_DIR/audio" ]; then
+    echo "[DEBUG] Removing audio file reference"
+    rm -f "$TMP_DIR/audio"
+  fi
+  
+  # Remove notification ID file if it exists
+  if [ -f "$TMP_DIR/notification_id" ]; then
+    echo "[DEBUG] Clearing notification ID"
+    echo "" > "$TMP_DIR/notification_id"
+  fi
+  
+  echo "[DEBUG] Reset complete"
+}
+
 # Main script logic
 case "$1" in
   start)
@@ -264,8 +327,11 @@ case "$1" in
   redo)
     redo_transcription "${2:-}"  # Pass second argument if it exists
     ;;
+  reset)
+    reset_loq
+    ;;
   *)
-    echo "Usage: $0 {start|stop|toggle|redo [mp3_file]}"
+    echo "Usage: $0 {start|stop|toggle|redo [mp3_file]|reset}"
     exit 1
     ;;
 esac
