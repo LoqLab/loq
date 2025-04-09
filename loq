@@ -21,16 +21,18 @@ log_error() {
 
 # Function to display notification
 notify() {
-  NOTIFICATION_ID=$(notify-send "$1" "$2" -e -u critical --print-id -t 0)
-  echo $NOTIFICATION_ID >"$TMP_DIR/notification_id"
+  # NOTIFICATION_ID=$(notify-send "$1" "$2" -e -u critical --print-id -t 0)
+  # echo $NOTIFICATION_ID >"$TMP_DIR/notification_id"
+  echo "[NOTIFICATION] $1: $2"
 }
 
 # Function to close notification
 close_notification() {
-  if [ -s "$TMP_DIR/notification_id" ]; then  
-    local id=$(cat "$TMP_DIR/notification_id")
-    gdbus call --session --dest=org.freedesktop.Notifications --object-path=/org/freedesktop/Notifications --method=org.freedesktop.Notifications.CloseNotification "$id" >/dev/null
-  fi
+  # if [ -s "$TMP_DIR/notification_id" ]; then  
+  #   local id=$(cat "$TMP_DIR/notification_id")
+  #   gdbus call --session --dest=org.freedesktop.Notifications --object-path=/org/freedesktop/Notifications --method=org.freedesktop.Notifications.CloseNotification "$id" >/dev/null
+  # fi
+  echo "[DEBUG] Closing notification"
 }
 
 # Function to start recording
@@ -46,6 +48,7 @@ start_recording() {
   
   # Display recording notification
   notify "Recording..." "🎙️ Recording has started"
+  echo "[DEBUG] Starting recording to $audio"
   
   # Start recording
   rec -c 1 -r 16000 -t wav "$audio" &
@@ -68,6 +71,7 @@ process_audio() {
     close_notification
     audio_kb=$(du -k "$mp3_audio" | cut -f1)
     notify "Sending to Whisper..." "🔊 Sending $audio_kb KB audio to Whisper API"
+    echo "[DEBUG] Sending $audio_kb KB audio to Whisper API"
   fi
   
   # Send audio file to OpenAI Whisper API using curl
@@ -119,12 +123,14 @@ process_audio() {
     # Close previous notification and show completion
     close_notification
     notify "Transcription Complete" "🔊 $word_count words / $recording_duration s, $words_per_minute wpm, processed in $processing_time s "
+    echo "[DEBUG] Transcription complete: $word_count words / $recording_duration s, $words_per_minute wpm, processed in $processing_time s"
     
     # Set up notification cleanup with a new background process
-    (
-      sleep $HUD_TIMEOUT
-      close_notification
-    ) &
+    # (
+    #   sleep $HUD_TIMEOUT
+    #   close_notification
+    # ) &
+    echo "[DEBUG] Skipping notification cleanup"
   fi
 
   # Copy response to both clipboard buffers
