@@ -21,18 +21,14 @@ log_error() {
 
 # Function to display notification
 notify() {
-  # NOTIFICATION_ID=$(notify-send "$1" "$2" -e -u critical --print-id -t 0)
-  # echo $NOTIFICATION_ID >"$TMP_DIR/notification_id"
+  notify-send -t 500 -e --hint=int:transient:1 -u normal -a "loq" "$1" "$2"
   echo "[NOTIFICATION] $1: $2"
 }
 
 # Function to close notification
 close_notification() {
-  # if [ -s "$TMP_DIR/notification_id" ]; then  
-  #   local id=$(cat "$TMP_DIR/notification_id")
-  #   gdbus call --session --dest=org.freedesktop.Notifications --object-path=/org/freedesktop/Notifications --method=org.freedesktop.Notifications.CloseNotification "$id" >/dev/null
-  # fi
-  echo "[DEBUG] Closing notification"
+  # No need to manage notification closing anymore
+  echo "[DEBUG] Notifications are transient and auto-close"
 }
 
 # Function to start recording
@@ -125,12 +121,8 @@ process_audio() {
     notify "Transcription Complete" "🔊 $word_count words / $recording_duration s, $words_per_minute wpm, processed in $processing_time s "
     echo "[DEBUG] Transcription complete: $word_count words / $recording_duration s, $words_per_minute wpm, processed in $processing_time s"
     
-    # Set up notification cleanup with a new background process
-    # (
-    #   sleep $HUD_TIMEOUT
-    #   close_notification
-    # ) &
-    echo "[DEBUG] Skipping notification cleanup"
+    # No need for notification cleanup as they're transient
+    echo "[DEBUG] Using transient notifications that auto-close"
   fi
 
   # Copy response to both clipboard buffers
