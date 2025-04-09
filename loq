@@ -21,7 +21,7 @@ log_error() {
 
 # Function to display notification
 notify() {
-  # notify-send -t 1 -e --hint=int:transient:1 -u normal -a "loq" "$1" "$2"
+  notify-send -t 1 -e --hint=int:transient:1 -u normal -a "loq" "$1" "$2"
   echo "[NOTIFICATION] $1: $2"
 }
 
@@ -124,8 +124,7 @@ process_audio() {
     notify "Transcription Complete" "🔊 $word_count words / $recording_duration s, $words_per_minute wpm, processed in $processing_time s "
     echo "[DEBUG] Transcription complete: $word_count words / $recording_duration s, $words_per_minute wpm, processed in $processing_time s"
     
-    # Notifications are commented out
-    echo "[DEBUG] Notifications are currently disabled"
+    # Notifications are now enabled
   fi
 
   # Copy response to both clipboard buffers
