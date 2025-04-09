@@ -21,7 +21,7 @@ log_error() {
 
 # Function to display notification
 notify() {
-  notify-send -t 1 -e --hint=int:transient:1 -u normal -a "loq" "$1" "$2"
+  # notify-send -t 1 -e --hint=int:transient:1 -u normal -a "loq" "$1" "$2"
   echo "[NOTIFICATION] $1: $2"
 }
 
@@ -41,6 +41,9 @@ start_recording() {
   
   # Create lock file to indicate recording is in progress
   touch "$TMP_DIR/recording.lock"
+  
+  # Create recording-now file with timestamp
+  echo "$(date -u +"%Y-%m-%d %H:%M:%S")" > "$LOQ_DIR/recording-now"
   
   # Display recording notification
   notify "Recording..." "🎙️ Recording has started"
@@ -121,8 +124,8 @@ process_audio() {
     notify "Transcription Complete" "🔊 $word_count words / $recording_duration s, $words_per_minute wpm, processed in $processing_time s "
     echo "[DEBUG] Transcription complete: $word_count words / $recording_duration s, $words_per_minute wpm, processed in $processing_time s"
     
-    # No need for notification cleanup as they're transient
-    echo "[DEBUG] Using transient notifications that auto-close"
+    # Notifications are commented out
+    echo "[DEBUG] Notifications are currently disabled"
   fi
 
   # Copy response to both clipboard buffers
@@ -167,6 +170,9 @@ stop_recording() {
 
   # Remove lock file to indicate recording is stopped
   rm -f "$TMP_DIR/recording.lock"
+  
+  # Remove recording-now file
+  rm -f "$LOQ_DIR/recording-now"
 
   local audio=$(cat "$TMP_DIR/audio")
   local mp3_audio="${audio%.wav}.mp3"
@@ -289,6 +295,12 @@ reset_loq() {
   if [ -f "$TMP_DIR/recording.lock" ]; then
     echo "[DEBUG] Removing recording lock file"
     rm -f "$TMP_DIR/recording.lock"
+  fi
+  
+  # Remove recording-now file if it exists
+  if [ -f "$LOQ_DIR/recording-now" ]; then
+    echo "[DEBUG] Removing recording-now file"
+    rm -f "$LOQ_DIR/recording-now"
   fi
   
   # Remove audio file reference if it exists
