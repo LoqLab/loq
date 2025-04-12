@@ -34,11 +34,11 @@
     - `notify-send` and `gdbus`: for notifications
     - `ffprobe`: for audio file analysis (part of ffmpeg)
     - `bc`: for floating point calculations
-    - `python3-gi` and `gir1.2-atspi-2.0`: for accessibility interface
+    - `python3-gi`, `gir1.2-atspi-2.0`, and `libatspi2.0-dev`: for accessibility interface
 
     On Ubuntu/Debian systems, you can install all dependencies with:
     ```bash
-    sudo apt install sox lame curl xclip xdotool libnotify-bin ffmpeg bc python3-gi gir1.2-atspi-2.0
+    sudo apt install sox lame curl xclip xdotool libnotify-bin ffmpeg bc python3-gi gir1.2-atspi-2.0 libatspi2.0-dev python3-pyatspi
     ```
 
     On other Linux distributions, use your package manager to install equivalent packages.
