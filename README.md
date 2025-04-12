@@ -30,14 +30,15 @@
     - `lame`: for MP3 conversion
     - `curl`: for making HTTP requests
     - `xclip`: for clipboard manipulation
-    - `xdotool`: for simulating keyboard input
+    - `xdotool`: for simulating keyboard input (fallback method)
     - `notify-send` and `gdbus`: for notifications
     - `ffprobe`: for audio file analysis (part of ffmpeg)
     - `bc`: for floating point calculations
+    - `python3-gi` and `gir1.2-atspi-2.0`: for accessibility interface
 
     On Ubuntu/Debian systems, you can install all dependencies with:
     ```bash
-    sudo apt install sox lame curl xclip xdotool libnotify-bin ffmpeg bc
+    sudo apt install sox lame curl xclip xdotool libnotify-bin ffmpeg bc python3-gi gir1.2-atspi-2.0
     ```
 
     On other Linux distributions, use your package manager to install equivalent packages.
@@ -72,7 +73,9 @@ You can modify the script to suit your specific needs. For example, you can chan
 
 ## Problems:
 
-For some reason, automatic pasting might not work in some terminals. In such cases, you will have to manually paste the text.
+Automatic text insertion uses the Linux accessibility API (AT-SPI) to directly place text at the cursor position. This should work in most GTK and Qt applications that support the accessibility APIs. If insertion fails, the script will fall back to the traditional clipboard paste method using xdotool, but this might not work in some terminals. In such cases, you may need to manually paste the text.
+
+You may need to enable accessibility features in your system settings for AT-SPI to work properly. On Ubuntu, go to Settings → Accessibility → Screen Reader and ensure accessibility services are enabled.
 
 ## Contributing:
 

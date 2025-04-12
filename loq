@@ -127,12 +127,13 @@ process_audio() {
     # Notifications are now enabled
   fi
 
-  # Copy response to both clipboard buffers
+  # Copy response to both clipboard buffers (keep for backup method)
   echo -n "$response" | xclip -sel clip
 
-  # Only simulate paste if requested
+  # Only insert text if requested
   if [ "$simulate_paste" = "true" ]; then
-    xdotool key --clearmodifiers 'ctrl+shift+v'
+    # Try AT-SPI first, fall back to xdotool if it fails
+    python3 "$LOQ_DIR/insert_text.py" "$response" || xdotool key --clearmodifiers 'ctrl+shift+v'
   fi
 
 }
