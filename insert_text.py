@@ -1,21 +1,18 @@
-import gi
-gi.require_version('Atspi', '2.0')
-from gi.repository import Atspi
+import pyatspi
 import sys
 
 def insert_text(text):
-    Atspi.init()
-    registry = Atspi.Registry()
-    focused = registry.get_focused()  # Corrected method
+    pyatspi.Registry.start()
+    focused = pyatspi.getFocus()  # Get focused element directly
     
-    # Traverse ancestors if needed
-    while focused and focused.get_role_name() not in ['text', 'edit']:
-        focused = focused.get_parent()
+    # Traverse ancestors for text components
+    while focused and focused.getRoleName() not in ['text', 'edit']:
+        focused = focused.parent
     
-    if focused and focused.get_role_name() in ['text', 'edit']:
-        text_interface = focused.query_text()
-        cursor_pos = text_interface.get_caret_offset()
-        focused.insert_text(text, cursor_pos, -1)
+    if focused and focused.getRoleName() in ['text', 'edit']:
+        text_interface = focused.queryText()
+        cursor_pos = text_interface.caretOffset
+        text_interface.insertText(cursor_pos, text, -1)
         return True
     return False
 
