@@ -133,7 +133,7 @@ process_audio() {
   # Only insert text if requested
   if [ "$simulate_paste" = "true" ]; then
     # Try AT-SPI first, fall back to xdotool if it fails
-    python3 "$LOQ_DIR/insert_text.py" "$response" || xdotool key --clearmodifiers 'ctrl+shift+v'
+    python3 "$LOQ_DIR/write_text.py" "$response" || xdotool key --clearmodifiers 'ctrl+shift+v'
   fi
 
 }
