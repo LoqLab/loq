@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import sys
+import gi
+gi.require_version('Atspi', '2.0')
 from gi.repository import Atspi
 
 def insert_text(text):
