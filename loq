@@ -134,7 +134,9 @@ process_audio() {
   if [ "$simulate_paste" = "true" ]; then
     # Try AT-SPI first, fall back to xdotool if it fails
     #python3 "$LOQ_DIR/write_text.py" "$response" ||
-    xdotool key --clearmodifiers 'ctrl+shift+v'
+    #xdotool key --clearmodifiers 'ctrl+shift+v'
+    # works for dvorak mapped over us qwerty (aaaahhhh)
+    ydotool key ctrl+shift+.
   fi
 
 }
