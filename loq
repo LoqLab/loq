@@ -136,7 +136,9 @@ process_audio() {
     #python3 "$LOQ_DIR/write_text.py" "$response" ||
     #xdotool key --clearmodifiers 'ctrl+shift+v'
     # works for dvorak mapped over us qwerty (aaaahhhh)
-    ydotool key ctrl+shift+.
+    #ydotool key ctrl+shift+.
+    #argh
+    YDOTOOL_SOCKET="/tmp/.ydotool_socket" ydotool key 29:1 42:1 52:1 29:0 42:0 52:0
   fi
 
 }
