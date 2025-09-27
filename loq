@@ -94,10 +94,29 @@ process_audio() {
   
   # Extract statistics from response and calculate additional stats
   local word_count=$(echo "$response" | wc -w)
-  local recording_duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$mp3_audio")
-  local words_per_second=$(echo "scale=2; $word_count / $recording_duration" | bc)
-  local words_per_minute=$(echo "scale=2; $words_per_second * 60" | bc)
-  local processing_time=$(echo "$end_time - $start_time" | bc)
+  local recording_duration
+  if ! recording_duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$mp3_audio" 2>/dev/null); then
+    log_error "Failed to read duration for $mp3_audio"
+    recording_duration="0"
+  fi
+  recording_duration=$(echo "$recording_duration" | tr -d '\r\n')
+  if [ -z "$recording_duration" ]; then
+    recording_duration="0"
+  fi
+
+  local words_per_second="0"
+  local words_per_minute="0"
+  if [[ "$recording_duration" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    if [ "$(echo "$recording_duration > 0" | bc -l)" = "1" ]; then
+      words_per_second=$(echo "scale=6; $word_count / $recording_duration" | bc -l)
+      words_per_minute=$(echo "scale=6; $words_per_second * 60" | bc -l)
+    fi
+  else
+    log_error "Invalid duration '$recording_duration' reported for $mp3_audio"
+    recording_duration="0"
+  fi
+
+  local processing_time=$(echo "$end_time - $start_time" | bc -l)
   local utc_time=$(date -u +"%Y%m%dT%H%M%SZ")
   local local_time=$(date +"%Y%m%dT%H%M%SZ")
   local microseconds_since_1970=$(date +%s%6N)
@@ -114,10 +133,11 @@ process_audio() {
 
   if [ "$show_notifications" = "true" ]; then
     # Format stats for display
-    words_per_second=$(printf "%.2f" $words_per_second)
-    words_per_minute=$(printf "%.2f" $words_per_minute)
-    processing_time=$(printf "%.2f" $processing_time)
-    recording_duration=$(printf "%.2f" $recording_duration)
+    # Force C numeric locale so decimal points are interpreted consistently
+    words_per_second=$(LC_NUMERIC=C printf "%.2f" "$words_per_second")
+    words_per_minute=$(LC_NUMERIC=C printf "%.2f" "$words_per_minute")
+    processing_time=$(LC_NUMERIC=C printf "%.2f" "$processing_time")
+    recording_duration=$(LC_NUMERIC=C printf "%.2f" "$recording_duration")
     
     # Close previous notification and show completion
     close_notification
