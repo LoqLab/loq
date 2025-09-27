@@ -132,13 +132,16 @@ process_audio() {
 
   # Only insert text if requested
   if [ "$simulate_paste" = "true" ]; then
-    # Try AT-SPI first, fall back to xdotool if it fails
-    #python3 "$LOQ_DIR/write_text.py" "$response" ||
-    #xdotool key --clearmodifiers 'ctrl+shift+v'
-    # works for dvorak mapped over us qwerty (aaaahhhh)
-    #ydotool key ctrl+shift+.
-    #argh
-    YDOTOOL_SOCKET="/tmp/.ydotool_socket" ydotool key 29:1 42:1 52:1 29:0 42:0 52:0
+    # Check keyboard layout configuration
+    if [ -f "$CONFIG_FILE" ] && grep -q "^KEYBOARD_LAYOUT=dvorak" "$CONFIG_FILE"; then
+      # Dvorak layout: send physical . key (52) which maps to V in Dvorak
+      # 29 = left ctrl, 42 = left shift, 52 = . (which is V in Dvorak)
+      YDOTOOL_SOCKET="/tmp/.ydotool_socket" ydotool key 29:1 42:1 52:1 29:0 42:0 52:0
+    else
+      # QWERTY layout (default): send Ctrl+Shift+V directly
+      # 29 = left ctrl, 42 = left shift, 47 = V
+      YDOTOOL_SOCKET="/tmp/.ydotool_socket" ydotool key 29:1 42:1 47:1 29:0 42:0 47:0
+    fi
   fi
 
 }

@@ -7,3 +7,8 @@
 #LOQ_API_KEY=gsk_...  # your Groq API key
 #LOQ_API_URL=https://api.groq.com/openai/v1/audio/transcriptions
 #LOQ_API_MODEL=whisper-large-v3
+
+# Keyboard layout configuration
+# Set to "dvorak" if you use Dvorak keyboard layout, otherwise leave as "qwerty" (default)
+# This affects the key combination sent for pasting (Ctrl+Shift+V)
+KEYBOARD_LAYOUT=qwerty

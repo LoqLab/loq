@@ -22,26 +22,122 @@
     - Choose your preferred API provider (OpenAI or Groq)
     - Uncomment that section
     - Replace the placeholder API key with your actual key
-    
+    - Configure your keyboard layout (see below)
+
     The template includes configurations for both OpenAI and Groq APIs - just uncomment and configure your preferred service.
+
+    **Keyboard Layout Configuration**:
+
+    If you use a Dvorak keyboard layout, add or modify this line in `~/.loq/keys`:
+    ```bash
+    KEYBOARD_LAYOUT=dvorak
+    ```
+
+    The default is `KEYBOARD_LAYOUT=qwerty`. This setting affects how loq sends the paste command (Ctrl+Shift+V):
+    - **QWERTY users**: Uses standard key code 47 for V
+    - **Dvorak users**: Uses key code 52 (period key) which maps to V in Dvorak layout
+
+    This ensures the paste command works correctly regardless of your keyboard layout.
 
 3. **Install the required dependencies**:
     - `sox` (`rec`): for audio recording
     - `lame`: for MP3 conversion
     - `curl`: for making HTTP requests
     - `xclip`: for clipboard manipulation
+    - `ydotool`: for simulating keyboard input (primary method)
     - `xdotool`: for simulating keyboard input (fallback method)
     - `notify-send` and `gdbus`: for notifications
     - `ffprobe`: for audio file analysis (part of ffmpeg)
     - `bc`: for floating point calculations
     - `python3-gi`, `gir1.2-atspi-2.0`, and `libatspi2.0-dev`: for accessibility interface
 
-    On Ubuntu/Debian systems, you can install all dependencies with:
+    On Ubuntu/Debian systems, you can install most dependencies with:
     ```bash
-    sudo apt install sox lame curl xclip xdotool libnotify-bin ffmpeg bc python3-gi gir1.2-atspi-2.0 libatspi2.0-dev python3-pyatspi
+    sudo apt install sox lame curl xclip xdotool libnotify-bin ffmpeg bc python3-gi gir1.2-atspi-2.0 libatspi2.0-dev
     ```
 
+    **Installing and Setting up ydotool**:
+
+    `ydotool` is not available in Ubuntu/Debian repos and needs to be built from source. It also requires a daemon to be running as a systemd service.
+
+    **Automated Installation (Recommended)**:
+
+    We provide an installation script that handles the entire setup process:
+    ```bash
+    sudo ./install-ydotool.sh
+    ```
+
+    This script will:
+    - Install build dependencies
+    - Build ydotool from source
+    - Set up the systemd service
+    - Start the ydotoold daemon
+    - Test the installation
+
+    **Manual Installation**:
+
+    If you prefer to install manually or the script doesn't work for your system:
+
+    1. **Build and install ydotool from source**:
+    ```bash
+    # Install build dependencies
+    sudo apt install build-essential cmake scdoc
+
+    # Clone and build ydotool
+    git clone https://github.com/ReimuNotMoe/ydotool.git
+    cd ydotool
+    mkdir build && cd build
+    cmake ..
+    make
+    sudo make install
+    ```
+
+    2. **Set up ydotoold as a system service**:
+
+    Create the systemd service file:
+    ```bash
+    sudo tee /etc/systemd/system/ydotoold.service > /dev/null << 'EOF'
+[Unit]
+Description=Starts ydotoold Daemon
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=3
+ExecStartPre=/bin/sleep 2
+ExecStartPre=/bin/rm -f /tmp/.ydotool_socket
+ExecStart=/usr/local/bin/ydotoold --socket-path=/tmp/.ydotool_socket --socket-perm=0666
+ExecReload=/usr/bin/kill -HUP $MAINPID
+KillMode=process
+TimeoutSec=180
+
+[Install]
+WantedBy=default.target
+EOF
+    ```
+
+    3. **Enable and start the service**:
+    ```bash
+    sudo systemctl daemon-reload
+    sudo systemctl enable ydotoold.service
+    sudo systemctl start ydotoold.service
+
+    # Verify it's running
+    sudo systemctl status ydotoold.service
+    ```
+
+    4. **Test ydotool**:
+    ```bash
+    # Should type "hello" wherever your cursor is
+    ydotool type "hello"
+    ```
+
+    Note: The system-level service with socket at `/tmp/.ydotool_socket` with 0666 permissions is required for loq to work properly.
+
     On other Linux distributions, use your package manager to install equivalent packages.
+
+    **Note**: The `python3-pyatspi` package mentioned in older versions is no longer needed - the AT-SPI functionality is provided through `python3-gi` and `gir1.2-atspi-2.0`.
 
 4. **Set up key bindings** in your settings (e.g., keyboard settings on Ubuntu GNOME Shell) to run the `loq` script with the `toggle` subcommand when a particular key or key combination is pressed (e.g., F10).
 
