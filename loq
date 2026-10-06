@@ -8,6 +8,7 @@ TMP_DIR="$LOQ_DIR/tmp"
 CONFIG_FILE="$LOQ_DIR/keys"
 STATS_FILE="$LOQ_DIR/stats.tsv"
 LOG_FILE="$LOQ_DIR/loq.log"
+LIMITS_CACHE="$LOQ_DIR/api-limits.tsv"
 HUD_TIMEOUT=2
 
 # Ensure all required directories exist
@@ -53,9 +54,128 @@ start_recording() {
   rec -c 1 -r 16000 -t wav "$audio" &
   echo $! > "$TMP_DIR/recording_pid"
   
-  # Set a timeout to automatically stop recording after a certain period (e.g., 1 hour)
-  (sleep 3600 && stop_recording) &
+  # Safety auto-stop so a forgotten recording cannot run away forever.
+  # Configurable via LOQ_MAX_RECORD_SECONDS (default 1 hour).
+  local max_record="${LOQ_MAX_RECORD_SECONDS:-3600}"
+  (sleep "$max_record" && stop_recording) &
   echo $! > "$TMP_DIR/cleanup_pid"
+}
+
+# --- Chunked transcription helpers -----------------------------------------
+
+# Send one audio file to the transcription API. Echoes the raw transcript.
+# Returns non-zero on HTTP/network failure (curl -f).
+send_audio_once() {
+  local file="$1"
+  local prompt="${2:-}"
+  local args=(-fsS -X POST
+    -H "Authorization: Bearer $LOQ_API_KEY"
+    -H "Content-Type: multipart/form-data"
+    -F "file=@$file"
+    -F "model=$LOQ_API_MODEL"
+    -F "response_format=text")
+  # --form-string avoids curl treating @/< in the prompt text as a file/stdin
+  [ -n "$prompt" ] && args+=(--form-string "prompt=$prompt")
+  curl "${args[@]}" "$LOQ_API_URL"
+}
+
+# Learn how long a single request may be from the provider, cache the answer,
+# and return the chunk length to use: min(learned, LOQ_MAX_CHUNK_SECONDS).
+# Providers without a models endpoint (e.g. Groq) fall back to the default.
+resolve_chunk_seconds() {
+  local cap="${LOQ_MAX_CHUNK_SECONDS:-600}"
+  local default="${LOQ_DEFAULT_CHUNK_SECONDS:-600}"
+  local ttl="${LOQ_LIMIT_CACHE_TTL:-86400}"
+  local now learned="" ts="" val="" line="" url=""
+  now=$(date +%s)
+
+  if [ -f "$LIMITS_CACHE" ]; then
+    line=$(grep -F "$LOQ_API_URL"$'\t' "$LIMITS_CACHE" 2>/dev/null | tail -n 1 || true)
+    if [ -n "$line" ]; then
+      IFS=$'\t' read -r url ts val <<< "$line"
+    fi
+  fi
+
+  if [ -n "$val" ] && [ -n "$ts" ] && [ "$((now - ts))" -lt "$ttl" ] 2>/dev/null; then
+    learned="$val"
+  else
+    local models_url="${LOQ_API_URL%/}/models" body
+    if body=$(curl -fsS --max-time 10 "$models_url" \
+                -H "Authorization: Bearer $LOQ_API_KEY" 2>/dev/null); then
+      learned=$(printf '%s' "$body" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for m in d.get("data", []):
+    cfg = m.get("audio_config") or {}
+    v = cfg.get("max_duration_seconds")
+    if isinstance(v, (int, float)) and v > 0:
+        print(int(v))
+        break
+' 2>/dev/null || true)
+    fi
+    if [ -n "$learned" ]; then
+      printf '%s\t%s\t%s\n' "$LOQ_API_URL" "$now" "$learned" >> "$LIMITS_CACHE"
+    fi
+  fi
+
+  [ -n "$learned" ] || learned="$default"
+
+  if [ "$learned" -gt "$cap" ] 2>/dev/null; then
+    printf '%s' "$cap"
+  else
+    printf '%s' "$learned"
+  fi
+}
+
+# Transcribe an audio file. Files at or under the chunk limit go in a single
+# request; longer files are split into <=chunk-second pieces and sent in order,
+# each piece's transcript appended to the previous one. Echoes the transcript.
+transcribe_audio() {
+  local mp3="$1"
+  local chunk duration
+  chunk=$(resolve_chunk_seconds)
+
+  duration=$(ffprobe -v error -show_entries format=duration \
+    -of default=noprint_wrappers=1:nokey=1 "$mp3" 2>/dev/null | tr -d '\r\n' || true)
+  [[ "$duration" =~ ^[0-9]+(\.[0-9]+)?$ ]] || duration=0
+
+  # Fast path: fits in one request.
+  if [ "$(echo "$duration <= $chunk" | bc -l)" = "1" ]; then
+    send_audio_once "$mp3" ""
+    return
+  fi
+
+  echo "[DEBUG] Audio is ${duration}s; splitting into ${chunk}s chunks" >&2
+  local tmpdir
+  tmpdir=$(mktemp -d "${TMP_DIR%/}/chunk.XXXXXX")
+  # Re-encode while splitting so every piece is a valid, standalone MP3.
+  if ! ffmpeg -v error -i "$mp3" -f segment -segment_time "$chunk" \
+        -c:a libmp3lame -q:a 4 "$tmpdir/part_%03d.mp3"; then
+    log_error "Failed to split audio for chunked transcription: $mp3"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  local out="" prev_tail="" part text
+  for part in "$tmpdir"/part_*.mp3; do
+    [ -e "$part" ] || continue
+    if ! text=$(send_audio_once "$part" "$prev_tail"); then
+      log_error "Chunk transcription failed: $part"
+      rm -rf "$tmpdir"
+      return 1
+    fi
+    text=$(printf '%s' "$text" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    if [ -n "$text" ]; then
+      out="${out:+$out }$text"
+      # Carry the transcript tail forward as context to reduce seam errors.
+      prev_tail=$(printf '%s' "$text" | tail -c 200)
+    fi
+  done
+  rm -rf "$tmpdir"
+  printf '%s' "$out"
 }
 
 # Function to process an MP3 file and generate transcription
@@ -73,20 +193,16 @@ process_audio() {
     echo "[DEBUG] Sending $audio_kb KB audio to Whisper API"
   fi
   
-  # Send audio file to OpenAI Whisper API using curl
+  # Send audio to the transcription API, chunking automatically if the
+  # recording is longer than a single request may be.
   local start_time=$(date +%s.%N)
-  local response=$(curl -s -X POST -H "Authorization: Bearer $LOQ_API_KEY" \
-    -H "Content-Type: multipart/form-data" \
-    -F file="@$mp3_audio" \
-    -F model=$LOQ_API_MODEL \
-    -F response_format="text" \
-    $LOQ_API_URL )
-  # trim leading and trailing whitespace from response
-  response=$(echo "$response" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-  if [ $? -ne 0 ]; then
-    log_error "Failed to send audio to Whisper API"
+  local response
+  if ! response=$(transcribe_audio "$mp3_audio"); then
+    log_error "Failed to send audio to Whisper API ($LOQ_PROVIDER @ $LOQ_API_URL)"
     exit 1
   fi
+  # trim leading and trailing whitespace from response
+  response=$(echo "$response" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
   local end_time=$(date +%s.%N)
 
   # Save transcription to a text file
@@ -238,18 +354,40 @@ fi
 
 source "$CONFIG_FILE"
 
-if [ -z "$LOQ_API_KEY" ]; then
-  log_error "API key not found. Please add your API key to $CONFIG_FILE"
+# --- Provider resolution ---------------------------------------------------
+# Pick the active provider with LOQ_PROVIDER (default: groq). Each provider
+# stores its settings in LOQ_<PROVIDER>_KEY / _URL / _MODEL, e.g.
+#   LOQ_PROVIDER=groq       -> LOQ_GROQ_KEY, LOQ_GROQ_URL, LOQ_GROQ_MODEL
+#   LOQ_PROVIDER=lunaroute  -> LOQ_LUNAROUTE_KEY, ...
+# Legacy flat LOQ_API_KEY / LOQ_API_URL / LOQ_API_MODEL are used as a fallback
+# when the selected provider has no specific values set.
+LOQ_PROVIDER="${LOQ_PROVIDER:-groq}"
+
+_provider_var() {
+  local name="LOQ_${LOQ_PROVIDER^^}_$1"
+  printf '%s' "${!name:-}"
+}
+
+_flat_key="${LOQ_API_KEY:-}"
+_flat_url="${LOQ_API_URL:-}"
+_flat_model="${LOQ_API_MODEL:-}"
+
+LOQ_API_KEY="$(_provider_var KEY)";     LOQ_API_KEY="${LOQ_API_KEY:-$_flat_key}"
+LOQ_API_URL="$(_provider_var URL)";     LOQ_API_URL="${LOQ_API_URL:-$_flat_url}"
+LOQ_API_MODEL="$(_provider_var MODEL)"; LOQ_API_MODEL="${LOQ_API_MODEL:-$_flat_model}"
+
+if [ -z "${LOQ_API_KEY:-}" ]; then
+  log_error "API key not found for provider '$LOQ_PROVIDER'. Please add it to $CONFIG_FILE"
   exit 1
 fi
 
-if [ -z "$LOQ_API_MODEL" ]; then
-  log_error "API model not found. Please add your model to $CONFIG_FILE"
+if [ -z "${LOQ_API_MODEL:-}" ]; then
+  log_error "API model not found for provider '$LOQ_PROVIDER'. Please add it to $CONFIG_FILE"
   exit 1
 fi
 
-if [ -z "$LOQ_API_URL" ]; then
-  log_error "API URL not found. Please add your API URL to $CONFIG_FILE"
+if [ -z "${LOQ_API_URL:-}" ]; then
+  log_error "API URL not found for provider '$LOQ_PROVIDER'. Please add it to $CONFIG_FILE"
   exit 1
 fi
 

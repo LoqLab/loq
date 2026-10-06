@@ -1,14 +1,55 @@
-# OpenAI configuration (uncomment and add your key to use)
-#LOQ_API_KEY=sk_...  # your OpenAI API key
-#LOQ_API_URL=https://api.openai.com/v1/audio/transcriptions
-#LOQ_API_MODEL=whisper-1
+# ---------------------------------------------------------------------------
+# Provider selection
+# ---------------------------------------------------------------------------
+# Switch providers by changing this single line. Valid values:
+#   groq, lunaroute, openai
+# Each provider reads LOQ_<PROVIDER>_KEY / _URL / _MODEL below.
+LOQ_PROVIDER=groq
 
-# Groq configuration (uncomment and add your key to use)
-#LOQ_API_KEY=gsk_...  # your Groq API key
-#LOQ_API_URL=https://api.groq.com/openai/v1/audio/transcriptions
-#LOQ_API_MODEL=whisper-large-v3
+# ---------------------------------------------------------------------------
+# Groq configuration
+# ---------------------------------------------------------------------------
+LOQ_GROQ_KEY=gsk_...  # your Groq API key
+LOQ_GROQ_URL=https://api.groq.com/openai/v1/audio/transcriptions
+LOQ_GROQ_MODEL=whisper-large-v3
 
+# ---------------------------------------------------------------------------
+# LunaRoute configuration (OpenAI-compatible gateway)
+# ---------------------------------------------------------------------------
+LOQ_LUNAROUTE_KEY=lr_...  # your LunaRoute API key
+LOQ_LUNAROUTE_URL=https://gw.lunaroute.com/v1/audio/transcriptions
+LOQ_LUNAROUTE_MODEL=whisper-large-v3
+
+# ---------------------------------------------------------------------------
+# OpenAI configuration
+# ---------------------------------------------------------------------------
+LOQ_OPENAI_KEY=sk_...  # your OpenAI API key
+LOQ_OPENAI_URL=https://api.openai.com/v1/audio/transcriptions
+LOQ_OPENAI_MODEL=whisper-1
+
+# ---------------------------------------------------------------------------
+# Legacy flat configuration (optional fallback)
+# ---------------------------------------------------------------------------
+# Used only when the selected provider has no LOQ_<PROVIDER>_* values set.
+#LOQ_API_KEY=...
+#LOQ_API_URL=...
+#LOQ_API_MODEL=...
+
+# ---------------------------------------------------------------------------
+# Long recordings / chunking
+# ---------------------------------------------------------------------------
+# A recording longer than LOQ_MAX_CHUNK_SECONDS is split into pieces of at most
+# that length, transcribed in order, then joined back together and pasted once.
+# The effective size is min(this value, the limit learned from the provider).
+LOQ_MAX_CHUNK_SECONDS=600
+
+# Safety auto-stop for a live recording: it is stopped automatically after this
+# many seconds, so a forgotten recording cannot run away. Raise for long meetings.
+LOQ_MAX_RECORD_SECONDS=3600
+
+# ---------------------------------------------------------------------------
 # Keyboard layout configuration
-# Set to "dvorak" if you use Dvorak keyboard layout, otherwise leave as "qwerty" (default)
-# This affects the key combination sent for pasting (Ctrl+Shift+V)
+# ---------------------------------------------------------------------------
+# Set to "dvorak" if you use Dvorak keyboard layout, otherwise leave as
+# "qwerty" (default). This affects the key combination sent for pasting.
 KEYBOARD_LAYOUT=qwerty

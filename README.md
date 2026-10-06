@@ -19,12 +19,41 @@
     chmod 600 ~/.loq/keys
     ```
     Then edit `~/.loq/keys` and:
-    - Choose your preferred API provider (OpenAI or Groq)
-    - Uncomment that section
-    - Replace the placeholder API key with your actual key
+    - Set `LOQ_PROVIDER` to your preferred API provider
+    - Replace the placeholder API key for that provider with your actual key
     - Configure your keyboard layout (see below)
 
-    The template includes configurations for both OpenAI and Groq APIs - just uncomment and configure your preferred service.
+    **Switching providers**:
+
+    All providers can stay configured at once. Switch between them by changing
+    a single line in `~/.loq/keys`:
+    ```bash
+    LOQ_PROVIDER=groq        # or: lunaroute, openai
+    ```
+    Each provider reads `LOQ_<PROVIDER>_KEY`, `LOQ_<PROVIDER>_URL`, and
+    `LOQ_<PROVIDER>_MODEL` (for example `LOQ_GROQ_KEY`,
+    `LOQ_LUNAROUTE_URL`). The template ships with sections for Groq,
+    LunaRoute (OpenAI-compatible gateway), and OpenAI. Legacy flat
+    `LOQ_API_KEY` / `LOQ_API_URL` / `LOQ_API_MODEL` values are still honoured
+    as a fallback when the selected provider has no specific values set.
+
+    **Long recordings / chunking**:
+
+    loq records continuously and only splits when sending, so you can record a
+    long meeting and let it run. A recording longer than the chunk limit is cut
+    into pieces of at most `LOQ_MAX_CHUNK_SECONDS` (default `600`, i.e. 10
+    minutes), each piece is transcribed in order, and the results are joined
+    back together and pasted as one transcript at the end.
+
+    The effective chunk length is `min(LOQ_MAX_CHUNK_SECONDS, provider limit)`.
+    The provider limit is learned from the API (`GET <LOQ_API_URL>/models`,
+    reading `audio_config.max_duration_seconds`) and cached in
+    `~/.loq/api-limits.tsv`; providers that do not expose it (e.g. Groq) fall
+    back to the default.
+
+    `LOQ_MAX_RECORD_SECONDS` (default `3600`) is a safety auto-stop so a
+    forgotten recording cannot run away; raise it for meetings longer than an
+    hour.
 
     **Keyboard Layout Configuration**:
 

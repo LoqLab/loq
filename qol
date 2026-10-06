@@ -11,6 +11,23 @@ fi
 
 source "$CONFIG_FILE"
 
+# --- Provider resolution (mirrors loq) -------------------------------------
+# Switch providers with LOQ_PROVIDER (default: groq) using LOQ_<PROVIDER>_* vars.
+LOQ_PROVIDER="${LOQ_PROVIDER:-groq}"
+
+_provider_var() {
+  local name="LOQ_${LOQ_PROVIDER^^}_$1"
+  printf '%s' "${!name:-}"
+}
+
+_flat_key="${LOQ_API_KEY:-}"
+_flat_url="${LOQ_API_URL:-}"
+_flat_model="${LOQ_API_MODEL:-}"
+
+LOQ_API_KEY="$(_provider_var KEY)";     LOQ_API_KEY="${LOQ_API_KEY:-$_flat_key}"
+LOQ_API_URL="$(_provider_var URL)";     LOQ_API_URL="${LOQ_API_URL:-$_flat_url}"
+LOQ_API_MODEL="$(_provider_var MODEL)"; LOQ_API_MODEL="${LOQ_API_MODEL:-$_flat_model}"
+
 if [ -z "${LOQ_API_KEY:-}" ] || [ -z "${LOQ_API_MODEL:-}" ] || [ -z "${LOQ_API_URL:-}" ]; then
     echo "Error: Missing required configuration variables" >&2
     echo "Please ensure LOQ_API_KEY, LOQ_API_MODEL, and LOQ_API_URL are set in $CONFIG_FILE" >&2
@@ -35,7 +52,7 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 ffmpeg -i "$INPUT_FILE" -f segment -segment_time 300 -c:a libmp3lame -q:a 4 "$TEMP_DIR/chunk_%03d.mp3" -y 2>/dev/null
 
 for chunk in "$TEMP_DIR"/chunk_*.mp3; do
-    curl -s -X POST \
+    curl -fsS -X POST \
         -H "Authorization: Bearer $LOQ_API_KEY" \
         -H "Content-Type: multipart/form-data" \
         -F "file=@$chunk" \
